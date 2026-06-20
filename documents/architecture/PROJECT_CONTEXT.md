@@ -1,8 +1,8 @@
-# Open Forge P1 — Project Context (Living Document)
+# Open Forge — Project Context (Living Document)
 
 > **Purpose:** Single attachable context file for Claude Projects, Cursor, and handoffs.
-> **Update rule:** Edit this file at the end of every phase completion (see §2).
-> **Do not duplicate** the full assessment spec here — link to it.
+> **Update rule:** Edit this file at the end of every team milestone or phase completion (see §2).
+> **Do not duplicate** the full architecture spec here — link to it.
 
 ---
 
@@ -10,66 +10,86 @@
 
 | Field | Value |
 |-------|-------|
-| **Last updated** | 2026-06-12 |
-| **Updated by** | Phase 4 validation + KiCad export implemented (FPR/FNR eval deferred) |
-| **Current phase** | Phase 4 — **implemented**; pipeline orchestrator + review queue pending |
-| **Active work** | GPU lab Phase 2 eval; grid-level golden GT; `pipeline.py` + review queue |
-| **Repo root** | repo root (`open_forge/`) |
-| **Code root** | `src/` (canonical); legacy prototype at `prototypes/prototypes/p1-parser/` |
+| **Last updated** | 2026-06-20 |
+| **Updated by** | Git history sync — repo consolidation, Team E output pipeline, Docker air-gap image |
+| **Current milestone** | Teams A–E gates implemented; **full E2E orchestrator + GPU eval deferred** |
+| **Active work** | Improvement-plan architecture (intent schema, DB, retrieval); GPU lab VLM eval |
+| **Repo root** | `open_forge/` (package: `openforge-pcb`) |
+| **Code root** | `src/` (canonical); legacy P1 prototype at `prototypes/p1-parser/` |
+| **Unit tests** | 699 passing (`pytest tests/unit -q`) — per commit 76b78d6 |
 
-### Phase dashboard
+### Team dashboard
 
-| Phase | Name | Status | Exit criteria met? |
-|-------|------|--------|-------------------|
-| **0** | Spike & Tooling | 🟡 Substantially complete | Partial — see §5 |
-| **1** | DLA Implementation | ✅ Complete | Yes — 5/5 golden PASS |
-| **2** | TSR Implementation | 🟡 Implemented | No — metrics deferred |
-| **3** | Extraction | 🟡 Implemented | No — golden eval deferred |
-| **4** | Validation + Integration | 🟡 Implemented | No — FPR/FNR eval deferred |
-| **5** | Docker + Delivery | ⬜ Not started | — |
+| Team | Subsystems | Gate | Status | Exit criteria met? |
+|------|------------|------|--------|-------------------|
+| **A** | Datasheet parser (P1, phases 1–5), scrapers | `eval/gates/team_a_gate.py` (7 checks) | ✅ Gate pass | Partial — GPU VLM eval deferred |
+| **B** | Knowledge graph, pin normalizer (P2/P4) | `eval/gates/team_b_gate.py` (8 checks) | ✅ Gate pass | Yes — unit + gate |
+| **C** | Intent parser, BOM generator (P5 prep) | `eval/gates/team_c_gate.py` (8 checks) | ✅ Gate pass | Yes — unit + gate |
+| **D** | Schematic, layout, NIR builder (P5) | `eval/gates/team_d_gate.py` (8 checks) | ✅ Gate pass | Yes — unit + gate |
+| **E** | KiCad + tscircuit output (P6) | `eval/gates/team_e_gate.py` (10 checks) | ✅ Gate pass | Yes — unit + gate |
+| **F** | Schemas, platform, review CLI | `eval/gates/team_f_gate.py` (7 checks) | ✅ Gate pass | Yes — unit + gate |
 
-**Legend:** ✅ Complete · 🟡 In progress / partial · ⬜ Not started
+**Legend:** ✅ Complete · 🟡 Implemented / partial · ⬜ Not started
+
+### Infrastructure
+
+| Deliverable | Status | Notes |
+|-------------|--------|-------|
+| `docker/Dockerfile` | ✅ | Python 3.11 + Poppler + Node 20 + `@tscircuit/cli` pre-cached |
+| `docker/build_airgapped_image.sh` | ✅ | Builds and exports `openforge-pcb:airgapped.tar` |
+| Full E2E orchestrator (prompt → fabrication files) | ⬜ | Team pipelines exist; top-level wiring pending |
+| Improvement-plan docs | ✅ | `documents/improvement_plan/` (5 architecture decisions + tscircuit loopholes) |
 
 ---
 
-## 2. Phase completion update protocol
+## 2. Milestone update protocol
 
-When a phase is **declared complete**, update the following sections in order:
+When a team milestone or phase is **declared complete**, update the following sections in order:
 
-1. **§1 Snapshot** — `Last updated`, `Current phase`, `Active work`, phase dashboard row
-2. **§5 Phase detail** — mark phase checklist items `[x]`, record measured metrics vs targets
+1. **§1 Snapshot** — `Last updated`, `Current milestone`, `Active work`, team dashboard row
+2. **§5 Team detail** — mark checklist items `[x]`, record measured metrics vs targets
 3. **§6 Code inventory** — list new modules/files added
 4. **§7 Model & corpus status** — if weights or corpus changed
 5. **§9 Blockers** — remove resolved items; add new ones
-6. **§11 Changelog** — one row: date, phase, summary, who/what triggered update
+6. **§11 Changelog** — one row: date, team/phase, summary
 
-### Phase sign-off checklist (copy per phase)
+### Milestone sign-off checklist (copy per team/phase)
 
 ```markdown
-### Phase N sign-off — YYYY-MM-DD
-- [ ] All module files implemented per assessment §6
-- [ ] Unit/integration tests pass (`pytest`)
-- [ ] Exit metrics measured on golden set (record in §5)
-- [ ] README.md phase status updated
+### Team X / Phase N sign-off — YYYY-MM-DD
+- [ ] All module files implemented per OPENFORGE_SUBSYSTEMS.md
+- [ ] Unit tests pass (`pytest tests/unit`)
+- [ ] Team gate passes (`python eval/gates/team_X_gate.py`)
+- [ ] README.md status updated
 - [ ] PROJECT_CONTEXT.md §1, §5, §6, §11 updated
-- [ ] SPIKE_RESULTS.md or eval reports updated (if applicable)
+- [ ] Eval reports updated (if applicable)
 ```
 
 ---
 
 ## 3. Mission & scope
 
-**Problem 1 (P1):** Extract tabular data — electrical characteristics, absolute maximum ratings, pinouts — from heterogeneous Texas Instruments PDF datasheets into validated, machine-readable JSON for downstream KiCad MCP consumption.
+**Open Forge** is an air-gapped, intelligence-driven PCB design system. Given a natural language prompt, it parses datasheets, queries an engineering knowledge graph, generates a validated BOM, synthesizes schematics, and exports KiCad and tscircuit fabrication files — with provenance on every value.
 
-| In scope | Out of scope (P1) |
+The six original problems (P1–P6) from `objectives.md` are sub-problems within the PCB Builder product:
+
+| Problem | Role | Canonical code |
+|---------|------|----------------|
+| P1 — Datasheet parsing | Data ingestion → `ComponentDatasheet` JSON | `src/datasheet/` |
+| P2 — Pin normalization | Cross-component net synthesis | `src/knowledge_graph/pin_normalizer/` |
+| P3 — Block diagram CV | Reference topologies into KG-2 | Planned (Team A) |
+| P4 — Knowledge graph | Authoritative engineering brain | `src/knowledge_graph/` |
+| P5 — Connection synthesis | Schematic + layout + NIR | `src/schematic/`, `src/layout/`, `src/nir/` |
+| P6 — KiCad / tscircuit export | Fabrication output | `src/output/` |
+
+| In scope | Out of scope (v1) |
 |----------|-------------------|
-| DLA → TSR → extraction → physics validation | Problems 2–6 (pin normalization, block diagrams, KG, netlisting, MCP server) |
-| Pinouts + abs-max ratings | Package/mechanical dimensions |
 | Air-gapped / on-prem deployment | Cloud APIs (Gemini, etc.) |
-| Analog/power IC datasheets | MCUs, DSPs, FPGAs (254-page DSP corpus archived) |
-| Output contract JSON (`<component_id>_parsed.json`) | KiCad MCP integration code |
+| TI analog/power IC datasheets | MCUs, DSPs, FPGAs (254-page DSP archived) |
+| KiCad + tscircuit dual export | Live KiCad MCP server integration |
+| Human review queue for low-confidence items | Automated PCB fabrication ordering |
 
-**Deployment:** Air-gapped. All model weights baked into Docker image (Phase 5).
+**Deployment:** Air-gapped. Model weights baked into Docker image; tscircuit CLI pre-cached in image layer.
 
 ---
 
@@ -79,288 +99,219 @@ Read in this order when implementing:
 
 | Priority | File | Role |
 |----------|------|------|
-| 1 | `documents/assessments/p1_assessment_filled.md` | **Authoritative** — schema, models, metrics, phased plan, output contract |
-| 2 | `documents/architecture/PROJECT_CONTEXT.md` | **This file** — current status only |
-| 3 | `documents/guides/CODING_STANDARDS_P1.md` | Code style, TDD, config patterns |
-| 4 | `documents/guides/QUICK_REFERENCE_PATTERNS.md` | Good/bad patterns cheat sheet |
-| 5 | `documents/architecture/problem_1_solution.md` | 4-phase architecture narrative |
-| 6 | `documents/guides/PROJECT_BOOTSTRAP_GUIDE.md` | Scaffolding templates |
-| 7 | `documents/objectives.md` | Six formal problem statements |
-| 8 | `documents/phase1/PHASE1_CORPUS_EVAL_TUNING_LOG.md` | Golden corpus eval tuning history |
+| 1 | `documents/architecture/OPENFORGE_ARCHITECTURE.md` | **Master system design** |
+| 2 | `documents/architecture/OPENFORGE_SUBSYSTEMS.md` | Subsystem specs (S1–S10) |
+| 3 | `documents/architecture/OPENFORGE_INTEGRATION.md` | KiCad + tscircuit integration |
+| 4 | `documents/architecture/PROJECT_CONTEXT.md` | **This file** — current status only |
+| 5 | `documents/assessments/p1_assessment_filled.md` | Authoritative P1 schema, metrics, phased plan |
+| 6 | `documents/improvement_plan/` | Next-step architectural decisions (intent schema, DB, retrieval) |
+| 7 | `documents/guides/CODING_STANDARDS_P1.md` | Code style, TDD, config patterns |
+| 8 | `documents/objectives.md` | Six formal problem statements |
 
-**Superseded:** `documents/assessments/p1_assessment.md` — use `_filled` instead.
+**Legacy P1 prototype:** `prototypes/p1-parser/` — golden corpus eval history; do not extend for new features.
 
 **Index:** `documents/README.md`
 
 ---
 
-## 5. Phase detail
+## 5. Team detail
 
-### Phase 0 — Spike & Tooling
+### Team A — Data Engineering (P1 Datasheet Parser) 🟡
 
-**Target exit criteria:** Model choices locked; golden corpus annotation ≥ 60% complete.
+**Gate:** 7/7 pass · **Pipeline:** `src/datasheet/pipeline.py` → `parse_datasheet()`
 
-| Task | Status | Notes |
-|------|--------|-------|
-| Project scaffold (`pyproject.toml`, dirs, venv) | ✅ | `prototypes/p1-parser/` |
-| `src/config.py` + `configs/default.yaml` | ✅ | Locked model paths, thresholds |
-| `src/schemas/datasheet.py` (output contract) | ✅ | `ComponentDatasheet`, etc. |
-| `src/schemas/pipeline.py` (inter-phase models) | ✅ | `GridMatrix`, `Phase1Output`, … |
-| `src/logging_config.py`, `src/utils/exceptions.py` | ✅ | |
-| Unit tests (`test_schemas.py`, `test_config.py`) | ✅ | 26 tests passing |
-| `scripts/download_models.py` | ✅ | HF download + shard resume |
-| Golden corpus 5/5 annotated | ✅ | See §7 |
-| Model spike (YOLOv8 vs Surya) | 🟡 | Ran without weights; **re-run required** |
-| Qwen2-VL download | ✅ | 20.23 GB verified (2026-06-12) |
-| Qwen2.5-7B download | 🟡 | Shard download in progress |
-| Test corpus (25 PDFs) | ⬜ | `corpus/test/` empty |
+| Phase | Module path | Status |
+|-------|-------------|--------|
+| 1 DLA | `src/datasheet/phase1_dla/` | ✅ Implemented + tested |
+| 2 TSR | `src/datasheet/phase2_tsr/` | ✅ Implemented (`vlm_enabled: false` on MacBook) |
+| 3 Extract | `src/datasheet/phase3_extract/` | ✅ Implemented (rule-based; LLM stub optional) |
+| 4 Validate | `src/datasheet/phase4_validate/` | ✅ Implemented |
+| 5 Layout | `src/datasheet/phase5_layout/` | ✅ Implemented |
 
-**Phase 0 metrics (spike — stale):**
+**Legacy prototype eval (5/5 golden PASS):** `prototypes/p1-parser/eval/phase1/PHASE1_RESULTS.md`
 
-| Metric | YOLOv8 | Surya | Target |
-|--------|--------|-------|--------|
-| Table detection recall | 0.000 | N/A | ≥ 0.92 |
-| Footnote detection recall | 0.000 | N/A | ≥ 0.85 |
-
-**Locked model choice (pre-spike):** YOLOv8n-DocLayNet. Re-run spike at `eval/spike/run_spike.py` → `eval/spike/SPIKE_RESULTS.md`.
+**Deferred exit metrics:**
+- Phase 2 `cell_accuracy` / `merged_cell_accuracy` — needs grid-level golden GT
+- Phase 3 `field_f1 ≥ 0.93` — needs `eval/phase3/` harness vs `*_ground_truth.json`
+- GPU lab run with `vlm_enabled: true` and `llm_enabled: true`
 
 ---
 
-### Phase 1 — DLA Implementation ✅
+### Team B — Knowledge Graph (P2/P4) ✅
 
-**Target exit criteria:** Table recall ≥ 0.92, precision ≥ 0.90, footnote recall ≥ 0.85, section acc ≥ 0.85 on golden set.
-
-| Module | Status |
-|--------|--------|
-| `src/phase1_dla/rasterize.py` | ✅ |
-| `src/phase1_dla/detect.py` | ✅ |
-| `src/phase1_dla/classify_section.py` | ✅ |
-| `src/phase1_dla/footnote_linker.py` | ✅ |
-| `src/phase1_dla/multipage_merge.py` | ✅ |
-| `src/phase1_dla/pdf_offset.py` | ✅ |
-| `src/phase1_dla/runner.py` | ✅ |
-| `eval/phase1/run_eval.py` | ✅ |
-
-**Measured metrics (2026-06-12, all 5 golden components):**
-
-| Component | Recall | Precision | Footnote | Section Acc |
-|-----------|--------|-----------|----------|-------------|
-| SN74LVC1G04 | 100% | 100% | 100% | 100% |
-| TLV7021 | 100% | 100% | 100% | 100% |
-| INA219 | 100% | 100% | 100% | 100% |
-| LM5176 | 100% | 100% | 100% | 100% |
-| TPS62933 | 100% | 100% | 100% | 100% |
-
-Report: `prototypes/p1-parser/eval/phase1/PHASE1_RESULTS.md`
+| Module | Path | Status |
+|--------|------|--------|
+| Graph builder + query | `src/knowledge_graph/graph.py`, `query/` | ✅ |
+| KG ingestion (AAC, app notes) | `src/knowledge_graph/ingestion/` | ✅ |
+| P1 importer | `src/knowledge_graph/importers/p1_importer.py` | ✅ |
+| Pin normalizer | `src/knowledge_graph/pin_normalizer/` | ✅ |
+| Semantic search | `src/knowledge_graph/semantic_search.py` | ✅ |
+| Admin CLI | `src/knowledge_graph/admin/` | ✅ |
 
 ---
 
-### Phase 2 — TSR Implementation 🟡
+### Team C — Intelligence Layer ✅
 
-**Target exit criteria:** Cell accuracy ≥ 0.95, merged-cell accuracy ≥ 0.90 on golden set.
+| Module | Path | Status |
+|--------|------|--------|
+| Intent parser | `src/intent/parser.py`, `pipeline.py` | ✅ |
+| Methodology classifier | `src/intent/methodology_classifier.py` | ✅ |
+| Ambiguity detector | `src/intent/ambiguity_detector.py` | ✅ |
+| BOM generator | `src/bom/generator.py`, `selector.py`, `validator.py` | ✅ |
+| Supplier cache | `src/bom/supplier_cache.py` | ✅ |
 
-| Module | Status |
-|--------|--------|
-| `src/phase2_tsr/merged_cell_handler.py` | ✅ |
-| `src/phase2_tsr/confidence_scorer.py` | ✅ |
-| `src/phase2_tsr/path_a_vector.py` | ✅ |
-| `src/phase2_tsr/path_b_vlm.py` | ✅ |
-| `src/phase2_tsr/runner.py` | ✅ |
-| `eval/phase2/run_eval.py` | ✅ (stub — metrics deferred) |
-| `tests/fixtures/phase2_mock_outputs.py` | ✅ |
-
-**Config:** `phase2_tsr` block in `configs/default.yaml` (`vlm_enabled: false` on MacBook).
-
-**Measured metrics:** — *deferred* (no grid-level golden GT; run on GPU lab with `vlm_enabled: true`)
-
-**Blocker for exit gate:** Annotate cell-level grid GT in `corpus/golden/` before `cell_accuracy` / `merged_cell_accuracy` can be measured.
+**Known gap:** Flat `explicit_constraints` strings — see `documents/improvement_plan/01_INTENT_PARSING_SCHEMA.md`.
 
 ---
 
-### Phase 3 — Extraction 🟡
+### Team D — Circuit Synthesis (P5) ✅
 
-**Target exit criteria:** Field F1 ≥ 0.93, unit normalization accuracy = 1.0 on golden set.
+| Module | Path | Status |
+|--------|------|--------|
+| Schematic synthesizer | `src/schematic/` | ✅ |
+| Layout engine | `src/layout/` | ✅ |
+| NIR builder + validator | `src/nir/` | ✅ |
+| Synthesis orchestrator | `src/synthesis/pipeline.py` | ✅ |
 
-| Module | Status |
-|--------|--------|
-| `src/phase3_extract/table_utils.py` | ✅ |
-| `src/phase3_extract/unit_normalizer.py` | ✅ |
-| `src/phase3_extract/parameter_extractor.py` | ✅ |
-| `src/phase3_extract/pinout_extractor.py` | ✅ |
-| `src/phase3_extract/absolute_max_extractor.py` | ✅ |
-| `src/phase3_extract/footnote_resolver.py` | ✅ |
-| `src/phase3_extract/validation.py` | ✅ |
-| `src/phase3_extract/runner.py` | ✅ |
-| `src/phase3_extract/prompt_templates.py` | ✅ (LLM stub — not wired) |
-| `src/phase3_extract/extractor.py` | ✅ (LLM stub — disabled by default) |
-| `tests/fixtures/phase2_mock_outputs.py` | ✅ (5-component golden mocks) |
-
-**Config:** `phase3_extract` block in `configs/default.yaml` (`llm_enabled: false` on MacBook).
-
-**Tests:** 53 passing — `pytest tests/unit/test_phase3_*.py tests/integration/test_phase3_e2e.py -v`
-
-**Measured metrics:** — *deferred* (requires `eval/phase3/` harness vs `*_ground_truth.json`)
-
-**Blocker for exit gate:** Golden semantic GT comparison (`field_f1 ≥ 0.93`); Qwen2.5 LLM path optional on GPU lab.
+**Contract:** `run_synthesis_pipeline(bom, datasheets, subgraph, config) → NIR` — never raises.
 
 ---
 
-### Phase 4 — Validation + KiCad Export 🟡
+### Team E — Output & Integration (P6) ✅
 
-**Target exit criteria:** FPR ≤ 0.02, FNR ≤ 0.01; end-to-end on 30-datasheet corpus.
+| Module | Path | Status |
+|--------|------|--------|
+| tscircuit serializer | `src/output/tscircuit_serializer.py` | ✅ |
+| KiCad serializer | `src/output/kicad_serializer.py` | ✅ |
+| Footprint/symbol maps | `src/output/tscircuit_*_map.py`, `kicad_*_map.py` | ✅ |
+| Design report | `src/output/doc_generator.py` | ✅ |
+| Output orchestrator | `src/output/` (`run_output_pipeline`) | ✅ |
 
-| Module | Status |
-|--------|--------|
-| `src/phase4_validate/ordering_rules.py` | ✅ |
-| `src/phase4_validate/sanity_ranges.py` | ✅ |
-| `src/phase4_validate/cross_parameter_rules.py` | ✅ |
-| `src/phase4_validate/absolute_max_rules.py` | ✅ |
-| `src/phase4_validate/validator.py` | ✅ |
-| `src/phase4_validate/kicad_exporter.py` | ✅ |
-| `src/phase4_validate/runner.py` | ✅ |
-| `tests/fixtures/phase3_mock_outputs.py` | ✅ |
-| `src/pipeline.py` | ⬜ (deferred) |
-| `src/review/queue.py`, `src/review/cli.py` | ⬜ (deferred) |
+**Gate:** 10/10 pass · **Tests:** `test_tscircuit_serializer.py`, `test_kicad_serializer.py`, `test_output_pipeline.py`, `test_doc_generator.py`
 
-**Schema:** `ValidationError` + extended `ValidationResult` in `schemas/datasheet.py`; optional `kicad_export` on `PipelineOutput`.
-
-**Tests:** 45 passing — `pytest tests/unit/test_phase4_*.py tests/integration/test_phase4_e2e.py -v`
-
-**Measured metrics:** — *deferred* (requires 30-datasheet corpus FPR/FNR harness)
-
-**Blocker for exit gate:** Full pipeline orchestrator; review queue; corpus-scale eval.
+**Reference:** `documents/improvement_plan/ts_circuit_architectural_loopholes.md`
 
 ---
 
-### Phase 5 — Docker + Delivery
+### Team F — Platform & Schemas ✅
 
-**Target exit criteria:** Air-gapped Docker runs E2E on all 30 datasheets; output contract signed off.
-
-| Deliverable | Status |
-|-------------|--------|
-| `Dockerfile` | ⬜ |
-| `build_airgapped_image.sh` | ⬜ |
-| Offline integration test | ⬜ |
-| Example output files for KiCad MCP team | ⬜ |
+| Module | Path | Status |
+|--------|------|--------|
+| Core schemas | `src/schemas/` (datasheet, intent, kg, nir) | ✅ |
+| Review queue + CLI | `src/review/queue.py`, `cli.py` | ✅ |
+| Config | `src/config.py`, `configs/default.yaml` | ✅ |
+| Team gates | `eval/gates/team_*_gate.py` | ✅ A–F |
 
 ---
 
 ## 6. Code inventory
 
-### Implemented (`prototypes/p1-parser/src/`)
+### Canonical (`src/`)
 
 ```
 src/
 ├── config.py
-├── logging_config.py
-├── phase1_dla/           # DLA — complete, 5/5 golden PASS
-├── phase2_tsr/           # TSR — implemented (metrics deferred)
-├── phase3_extract/       # Extraction — rule-based (golden eval deferred)
-├── phase4_validate/    # Validation + KiCad export (FPR/FNR eval deferred)
-├── schemas/
-│   ├── __init__.py
-│   ├── datasheet.py      # Output contract (Pydantic)
-│   └── pipeline.py       # Inter-phase transport models
-└── utils/
-    └── exceptions.py
+├── intent/                 # Team C — NL prompt → intent_dict
+├── knowledge_graph/        # Team B — KG build, query, pin normalizer, ingestion
+├── bom/                    # Team C — BOM generation and validation
+├── datasheet/              # Team A — P1 parser (phases 1–5) + pipeline.py
+├── schematic/              # Team D — schematic synthesis
+├── layout/                 # Team D — layout spec generation
+├── nir/                    # Team D — NIR builder + validator
+├── synthesis/              # Team D — synthesis orchestrator
+├── output/                 # Team E — KiCad + tscircuit serializers
+├── review/                 # Team F — human review queue + CLI
+└── schemas/                # Team F — Pydantic contracts (datasheet, intent, kg, nir)
 ```
 
-### Scaffolded (empty — awaiting implementation)
+### Tests (`tests/`)
 
 ```
-src/phase4_validate/
-src/review/
-src/pipeline.py           # Not yet created
+tests/unit/                 # 699 tests across all teams
+tests/integration/          # (placeholder)
+eval/gates/                 # Team acceptance gates A–F
 ```
 
-### Tests
+### Legacy prototype (`prototypes/p1-parser/`)
+
+Archived standalone four-phase parser. Retained for:
+- Golden corpus eval history (`eval/phase1/PHASE1_RESULTS.md`)
+- Model download scripts (`scripts/download_models.py`)
+- Spike results (`eval/spike/SPIKE_RESULTS.md`)
+
+### Config & data
 
 ```
-tests/unit/test_schemas.py
-tests/unit/test_config.py
-tests/unit/test_phase1_*.py
-tests/unit/test_phase2_*.py
-tests/unit/test_phase3_*.py   # 53 tests
-tests/unit/test_phase4_*.py   # 45 tests
-tests/integration/test_phase2_e2e.py
-tests/integration/test_phase3_e2e.py
-tests/integration/test_phase4_e2e.py
-tests/fixtures/phase2_mock_outputs.py
-tests/fixtures/phase3_mock_outputs.py
-```
-
-### Scripts & eval
-
-```
-scripts/download_models.py
-eval/spike/run_spike.py
-eval/spike/SPIKE_RESULTS.md
-corpus/golden/validate_ground_truth.py
+configs/default.yaml        # Canonical runtime config
+configs/canonical_functions.yaml
+configs/sources.yaml
+corpus/golden/              # 5 hand-verified TI PDFs + ground_truth JSON
+data/                       # KG graph storage (gitignored runtime data)
+docker/                     # Air-gapped deployment image
 ```
 
 ---
 
 ## 7. Model & corpus status
 
-### Model weights (`prototypes/p1-parser/models/`)
+### Model weights
 
-| Model | Path | Status | Size |
-|-------|------|--------|------|
-| YOLOv8n-DocLayNet | `yolov8_doclaynets.pt` | ✅ Verified | ~6.3 MB |
-| Qwen2-VL-7B-Instruct | `Qwen2-VL-7B-Instruct/` | ✅ Verified | ~20.2 GB |
-| Qwen2.5-7B-Instruct | `Qwen2.5-7B-Instruct/` | 🟡 Downloading | ~15 GB |
+Canonical config paths in `configs/default.yaml`. Weights live under `models/` (gitignored) — download via legacy prototype script:
 
-Download: `python scripts/download_models.py --all` · Log: `logs/download.log`
+```bash
+cd prototypes/p1-parser && python scripts/download_models.py --all
+```
+
+| Model | Role | Status |
+|-------|------|--------|
+| YOLOv8n-DocLayNet | Phase 1 DLA | ✅ Verified in prototype |
+| Qwen2-VL-7B-Instruct | Phase 2 Path B (VLM) | ✅ Verified; GPU eval deferred |
+| Qwen2.5-7B-Instruct | Phase 3 LLM + intent parser | ✅ Verified; disabled on MacBook |
 
 ### Golden corpus — 5/5 complete ✅
 
-| # | Component | Ground truth file |
-|---|-----------|-------------------|
+Promoted to repo root: `corpus/golden/`
+
+| # | Component | Ground truth |
+|---|-----------|--------------|
 | 1 | TI_SN74LVC1G04 | `corpus/golden/TI_SN74LVC1G04_v1_ground_truth.json` |
 | 2 | TI_TLV7021 | `corpus/golden/TI_TLV7021_v1_ground_truth.json` |
 | 3 | TI_INA219 | `corpus/golden/TI_INA219_v1_ground_truth.json` |
 | 4 | TI_LM5176 | `corpus/golden/TI_LM5176_v1_ground_truth.json` |
 | 5 | TI_TPS62933 | `corpus/golden/TI_TPS62933_v1_ground_truth.json` |
 
-**Archived:** `TI_TMS320F280039C` → `corpus/archive/` (DSP MCU, out of P1 scope). Replaced by TPS62933.
-
-**Manifest:** `corpus/golden/CORPUS_MANIFEST.md`
+**Archived:** `TI_TMS320F280039C` → out of P1 scope (DSP MCU).
 
 ### Test corpus — 0/25
 
-`corpus/test/` is empty. Curate 25 additional TI datasheets for Phase 4 E2E eval.
+`corpus/test/` empty. Curate 25 additional TI datasheets for corpus-scale E2E eval.
 
 ---
 
 ## 8. Architecture (pipeline)
 
+High-level flow — full detail in `OPENFORGE_ARCHITECTURE.md`:
+
 ```
-PDF datasheet
-    │
-    ▼
-Phase 1 — DLA (YOLOv8n-DocLayNet)
-    │  table crops, footnote_map, section_type labels
-    ▼
-Phase 2 — TSR (pdfplumber+Camelot ∥ Qwen2-VL → confidence pick)
-    │  GridMatrix per table
-    ▼
-Phase 3 — Extraction (rule-based grid parsers; Qwen2.5 LLM stub optional)
-    │  ComponentDatasheet (partial, per section)
-    ▼
-Phase 4 — Validation (physics rules → pass / warn / block)
-    │
-    ▼
-<component_id>_parsed.json
+Natural Language Prompt
+    → Intent Parser (Team C)
+    → KG Query (Team B)
+    → BOM Generator (Team C) ──[human review if confidence < 0.85]──
+    → Datasheet Parser P1 phases 1–5 (Team A)
+    → Pin Normalizer (Team B)
+    → Schematic + Layout + NIR (Team D)
+    → KiCad + tscircuit Export (Team E)
 ```
 
 ### Locked models (air-gapped)
 
 | Phase | Model | Fallback |
 |-------|-------|----------|
-| 1 DLA | YOLOv8n-DocLayNet | Surya (if spike recall fails) |
+| 1 DLA | YOLOv8n-DocLayNet | Surya |
 | 2 Path A | pdfplumber + Camelot lattice | — |
 | 2 Path B | Qwen2-VL-7B-Instruct | LLaVA-1.6-34B |
-| 3 Extract | Qwen2.5-7B-Instruct + Instructor | Llama-3.1-8B |
+| 3 Extract | Qwen2.5-7B-Instruct + Instructor | Rule-based grid parsers |
+| Intent | Qwen2.5-7B-Instruct + Instructor | — |
 
 ---
 
@@ -368,17 +319,19 @@ Phase 4 — Validation (physics rules → pass / warn / block)
 
 ### Blockers
 
-1. **Grid-level golden GT** — required for Phase 2 `cell_accuracy` / `merged_cell_accuracy` exit gate
-2. **GPU lab run** — Phase 2 VLM path needs `vlm_enabled: true` on GPU machine
-3. **Qwen2.5-7B** — optional for Phase 3 LLM fallback (`phase3_extract.llm_enabled: true` on GPU lab)
+1. **Full E2E orchestrator** — individual team pipelines exist; no single `prompt → files` entry point yet
+2. **GPU lab verification** — Phase 2 VLM and Phase 3 LLM paths need GPU run with weights
+3. **Grid-level golden GT** — required for Phase 2 cell/merged-cell accuracy exit gate
+4. **Intent schema gap** — flat constraint strings block typed downstream reasoning (`improvement_plan/01`)
+5. **Storage architecture** — DB schema and search strategy documented but not implemented (`improvement_plan/04`, `05`)
 
 ### Immediate next steps (ordered)
 
-1. Run Phase 2 on GPU lab: `python eval/phase2/run_eval.py --corpus corpus/golden --save-outputs`
-2. Annotate grid-level golden GT for 5 components
-3. Build `eval/phase3/` harness and run golden semantic comparison (`field_f1 ≥ 0.93`)
-4. Implement `src/pipeline.py` (Phase 1→2→3→4 orchestrator)
-5. Implement `src/review/queue.py` + `src/review/cli.py`
+1. Wire top-level E2E orchestrator across Team C → A → B → D → E pipelines
+2. Run GPU lab eval: Phase 2 VLM + Phase 3 LLM with golden corpus
+3. Annotate grid-level golden GT for 5 components
+4. Implement improvement-plan intent schema (`01_INTENT_PARSING_SCHEMA.md`)
+5. Stand up storage layer per `04_DATABASE_SCHEMA.md`
 
 ---
 
@@ -386,51 +339,53 @@ Phase 4 — Validation (physics rules → pass / warn / block)
 
 ```
 open_forge/
+├── README.md
+├── pyproject.toml                          # package: openforge-pcb
 ├── documents/
-│   ├── README.md                   ← documents index
-│   ├── objectives.md
-│   ├── assessments/
-│   │   └── p1_assessment_filled.md ← authoritative spec
 │   ├── architecture/
-│   │   ├── PROJECT_CONTEXT.md      ← this file (attach to Claude Projects)
-│   │   └── problem_1_solution.md
-│   ├── guides/
-│   │   ├── CODING_STANDARDS_P1.md
-│   │   └── QUICK_REFERENCE_PATTERNS.md
-│   └── phase1/
-│       ├── CURSOR_PROMPT_PHASE1.md
-│       └── PHASE1_CORPUS_EVAL_TUNING_LOG.md
-└── prototypes/p1-parser/
-    ├── src/
-    ├── corpus/golden/              # 5 PDFs + 5 ground_truth JSON
-    ├── corpus/test/                # 25 PDFs (TODO)
-    ├── corpus/archive/             # TMS320 archived
-    ├── models/                     # Offline weights (gitignored)
-    ├── configs/default.yaml
-    ├── eval/spike/
-    └── tests/unit/
+│   │   ├── PROJECT_CONTEXT.md              ← this file
+│   │   ├── OPENFORGE_ARCHITECTURE.md       ← master design
+│   │   └── OPENFORGE_SUBSYSTEMS.md
+│   ├── improvement_plan/                   ← next-step architecture decisions
+│   └── assessments/p1_assessment_filled.md
+├── src/                                    ← canonical codebase
+├── tests/unit/
+├── eval/gates/                             ← team acceptance gates
+├── corpus/golden/
+├── docker/                                 ← air-gapped image
+└── prototypes/p1-parser/                   ← legacy P1 prototype (reference only)
 ```
 
 ### Quick commands
 
 ```bash
-cd p1-parser && source venv/bin/activate
-pytest tests/unit/ -v
-python corpus/golden/validate_ground_truth.py
-python scripts/download_models.py --all
-python eval/spike/run_spike.py
+python3 -m venv venv && source venv/bin/activate
+pip install -e .
+
+pytest tests/unit -q
+python eval/gates/team_a_gate.py   # repeat for b–f
+
+# Air-gapped Docker build (requires network)
+./docker/build_airgapped_image.sh
+
+# Legacy P1 golden eval
+cd prototypes/p1-parser && python eval/phase1/run_eval.py
 ```
 
 ---
 
 ## 11. Changelog
 
-| Date | Phase | Summary |
-|------|-------|---------|
-| 2026-06-12 | 0 | Golden corpus 5/5 complete (TPS62933 replaces TMS320). Qwen2-VL verified. Bootstrap + schemas + 26 unit tests done. Spike metrics stale. PROJECT_CONTEXT.md created. |
-| 2026-06-12 | 1 | Phase 1 DLA complete. Golden eval 5/5 PASS (100% recall/precision/footnote/section acc on all components). Fixes: merge-before-cap, cover offset detection, classify offset scope correction. |
-| 2026-06-12 | 2 | Phase 2 TSR modules implemented (merged_cell_handler, confidence_scorer, path_a_vector, path_b_vlm, runner). 45 unit/integration tests pass. Eval metrics deferred pending grid GT + GPU run. |
+| Date | Team/Phase | Summary |
+|------|------------|---------|
+| 2026-06-20 | E, F | Team E output pipeline complete (KiCad + tscircuit serializers, doc generator). Docker air-gap image added. 699 unit tests. Team E gate 10/10. |
+| 2026-06-20 | E | tscircuit architectural loopholes documented. |
+| 2026-06-19 | All | Repo consolidated: `openforge-pcb` at repo root; P1 prototype archived to `prototypes/p1-parser/`. Golden corpus promoted to `corpus/golden/`. Teams A–F code + gates bootstrapped. 654 unit tests; gates A–D pass. |
+| 2026-06-19 | — | Improvement plans added (`documents/improvement_plan/`): intent schema, requirement engine, retrieval/KB, DB schema, search/storage deployment. |
+| 2026-06-18 | — | Architectural revamp: OPENFORGE_*.md master docs; six-problem reframing as PCB Builder sub-problems. |
+| 2026-06-13 | A (P1) | Legacy prototype Phase 1–4 implemented. Phase 1 golden eval 5/5 PASS. |
+| 2026-06-12 | 0 | Golden corpus 5/5. Bootstrap + schemas. PROJECT_CONTEXT.md created. |
 
 ---
 
-*When in doubt: implement against `p1_assessment_filled.md`; report status here.*
+*When in doubt: implement against `OPENFORGE_ARCHITECTURE.md` and `OPENFORGE_SUBSYSTEMS.md`; report status here.*

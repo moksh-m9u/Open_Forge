@@ -13,16 +13,11 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, Field
 
-from src.schemas.intent import ImprovedIntentDict
+from src.schemas.intent import DesignMethodology, FrequencySpec, ImprovedIntentDict
 
 if TYPE_CHECKING:
     from src.config import Config
-    from src.schemas.intent import (
-        AmbiguityFlag,
-        DesignMethodology,
-        FrequencySpec,
-        IntentDict,
-    )
+    from src.schemas.intent import IntentDict
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +138,37 @@ def clean_goal(raw_goal: str) -> str:
             return COMPONENT_TYPE_NORMALIZATION[last]
 
     return "_".join(parts[:4])
+
+
+def _typed_constraints_as_strings(parsed: ParsedIntent) -> list[str]:
+    """
+    Converts populated typed v2 fields back into canonical string tokens
+    so constraint_inferrer can deduplicate against them.
+    Falls back to parsed.explicit_constraints for any string that did not
+    map to a typed field.
+    """
+    typed: list[str] = []
+
+    electrical = getattr(parsed, "electrical", None)
+    if electrical and electrical.power_budget_mw is not None:
+        typed.append("low_power")
+    thermal = getattr(parsed, "thermal", None)
+    if thermal and thermal.operating_temp_min_c is not None:
+        typed.append("wide_temperature")
+    reliability = getattr(parsed, "reliability", None)
+    if reliability and reliability.operating_environment in (
+        "military", "industrial"
+    ):
+        typed.append("high_reliability")
+    manufacturing = getattr(parsed, "manufacturing", None)
+    if manufacturing and manufacturing.board_dimensions_mm is not None:
+        typed.append("compact")
+
+    remainder = [
+        c for c in (parsed.explicit_constraints or [])
+        if c not in typed
+    ]
+    return typed + remainder
 
 
 def _to_snake_case(text: str) -> str:
@@ -357,8 +383,8 @@ def parse_intent(
     from src.intent.ambiguity_detector import detect_ambiguities
     from src.intent.constraint_inferrer import infer_constraints
     from src.intent.methodology_classifier import validate_methodology
+    from src.schemas.common import Ambiguity
     from src.schemas.intent import (
-        AmbiguityFlag,
         DesignMethodology,
     )
 
@@ -381,7 +407,7 @@ def parse_intent(
 
     # Step 3: Infer constraints from application context
     inferred_constraints = infer_constraints(
-        parsed.application, parsed.explicit_constraints
+        parsed.application, _typed_constraints_as_strings(parsed)
     )
 
     # Step 4: Detect ambiguities
@@ -389,7 +415,6 @@ def parse_intent(
         goal=cleaned_goal,
         frequency=parsed.frequency,
         application=parsed.application,
-        explicit_constraints=parsed.explicit_constraints,
         inferred_constraints=inferred_constraints,
         design_methodology=validated_methodology,
         board_type=parsed.board_type,
@@ -400,17 +425,16 @@ def parse_intent(
     ambiguity_flags = detect_ambiguities(draft_intent, prompt)
     for ambiguity in parsed.ambiguities:
         ambiguity_flags.append(
-            AmbiguityFlag(
+            Ambiguity(
                 field="unknown",
                 description=ambiguity,
                 severity="WARNING",
-                options=[],
             )
         )
 
     # Step 5: Determine if clarification is required
     clarification_required = any(
-        flag.severity == "CRITICAL" for flag in ambiguity_flags
+        flag.blocking for flag in ambiguity_flags
     )
 
     # Step 6: Construct IntentDict
@@ -418,7 +442,6 @@ def parse_intent(
         goal=cleaned_goal,
         frequency=parsed.frequency,
         application=parsed.application,
-        explicit_constraints=parsed.explicit_constraints,
         inferred_constraints=inferred_constraints,
         design_methodology=validated_methodology,
         board_type=parsed.board_type,
@@ -458,7 +481,7 @@ def get_clarification_questions(
     questions: list[dict[str, Any]] = []
 
     for flag in intent.ambiguities:
-        if flag.severity != "CRITICAL":
+        if not flag.blocking:
             continue
 
         # Generate human-friendly question based on field
@@ -473,7 +496,7 @@ def get_clarification_questions(
         questions.append({
             "question": question_text,
             "field": flag.field,
-            "options": flag.options,
+            "options": flag.candidate_resolutions,
         })
 
     return questions

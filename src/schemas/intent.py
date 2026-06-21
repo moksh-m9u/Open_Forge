@@ -18,9 +18,24 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from .common import (
+    AccuracySpec,
+    Ambiguity,
+    DesignRequest,
+    ImpliedRequirement,
+    NoiseSpec,
+    OutOfScopeRequest,
+    ProductionVolume,
+    SchemaVersionError,
+    StabilitySpec,
+    TopologyGuess,
+)
+
+MAX_PROMPT_TOKENS = 4000
 
 
 class FrequencySpec(BaseModel):
@@ -75,28 +90,6 @@ class DesignMethodology(str, Enum):
     MIXED_SIGNAL = "mixed_signal"  # Analog/digital mixed designs
     STANDARD_SMD = "standard_SMD"  # Standard surface-mount digital/analog
     THROUGH_HOLE = "through_hole"  # Through-hole designs (prototyping, high power)
-
-
-class NoiseSpec(BaseModel):
-    target_value: Optional[float] = None
-    unit: Optional[str] = None
-    bandwidth_hz: Optional[float] = None
-    measurement_condition: Optional[str] = None
-    raw_text: str
-
-
-class AccuracySpec(BaseModel):
-    absolute_ppm: Optional[float] = None
-    relative_percent: Optional[float] = None
-    drift_ppm_per_C: Optional[float] = None
-    raw_text: str
-
-
-class StabilitySpec(BaseModel):
-    short_term_ppm: Optional[float] = None
-    long_term_ppm_per_year: Optional[float] = None
-    thermal_stability_ppm_per_C: Optional[float] = None
-    raw_text: str
 
 
 class PerformanceRequirements(BaseModel):
@@ -179,7 +172,7 @@ class ComplianceRequirements(BaseModel):
 class CostConstraints(BaseModel):
     bom_budget_usd: Optional[float] = None
     per_unit_target_usd: Optional[float] = None
-    production_volume: Optional[str] = None
+    production_volume: Optional[ProductionVolume] = None
     prefer_cots: bool = True
     avoid_obsolete: bool = True
     preferred_suppliers: list[str] = Field(default_factory=list)
@@ -194,25 +187,6 @@ class ComponentPreference(BaseModel):
     exclusion: Optional[str] = None
 
 
-class ImpliedRequirement(BaseModel):
-    requirement: str
-    component_implication: Optional[str] = None
-    reasoning: str
-    confidence: float = Field(ge=0.0, le=1.0)
-    source_constraint: str
-    priority: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"] = "MEDIUM"
-
-
-class DesignRequest(BaseModel):
-    request_type: Literal[
-        "bom", "schematic", "pcb_layout", "noise_analysis",
-        "simulation", "spice_netlist", "design_report",
-        "python_gui", "firmware",
-    ]
-    in_scope: bool
-    out_of_scope_reason: Optional[str] = None
-
-
 class _IntentDictBase(BaseModel):
     """Structured design intent extracted from user prompt.
 
@@ -224,7 +198,6 @@ class _IntentDictBase(BaseModel):
         goal: High-level design objective (e.g., "5V to 3.3V buck regulator")
         frequency: Operating frequency for RF/power designs, None if N/A
         application: Target application domain (e.g., "IoT sensor", "automotive")
-        explicit_constraints: User-specified constraints from prompt
         inferred_constraints: System-derived constraints from domain knowledge
         design_methodology: Selected methodology guiding design rules
         board_type: PCB classification (e.g., "2-layer FR4", "4-layer HDI")
@@ -233,15 +206,13 @@ class _IntentDictBase(BaseModel):
         raw_prompt: Original user input for provenance
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     goal: str = Field(description="High-level design objective")
     frequency: Optional[FrequencySpec] = Field(
         default=None, description="Operating frequency for RF/power designs, None if N/A"
     )
     application: str = Field(description="Target application domain")
-    explicit_constraints: list[str] = Field(
-        default_factory=list,
-        description="User-specified constraints from prompt",
-    )
     inferred_constraints: list[str] = Field(
         default_factory=list,
         description="System-derived constraints from domain knowledge",
@@ -265,9 +236,13 @@ class ImprovedIntentDict(_IntentDictBase):
     IntentDict v2. Extends v1 with typed requirement categories.
     All v1 fields inherited unchanged from _IntentDictBase.
     All new fields have defaults — v1 construction sites work without modification.
+
+    Pipeline must halt before Stage 2 if clarification_required is True and
+    any ambiguity has blocking=True. Caller is responsible for enforcement.
     """
     # New v2 fields — ALL have defaults so existing construction sites are unaffected
     goal_confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    goal_topologies: list[TopologyGuess] = Field(default_factory=list)
     goal_topology: Optional[str] = None
     performance: Optional[PerformanceRequirements] = None
     electrical: Optional[ElectricalConstraints] = None
@@ -280,18 +255,58 @@ class ImprovedIntentDict(_IntentDictBase):
     implied_requirements: list[ImpliedRequirement] = Field(default_factory=list)
     missing_critical_specs: list[str] = Field(default_factory=list)
     contradictions_detected: list[str] = Field(default_factory=list)
-    design_requests: list[DesignRequest] = Field(default_factory=list)
+    in_scope_requests: list[DesignRequest] = Field(default_factory=list)
+    out_of_scope_requests: list[OutOfScopeRequest] = Field(default_factory=list)
+    ambiguities: list[Ambiguity] = Field(default_factory=list)
     parsed_at: str = Field(
         default_factory=lambda: datetime.utcnow().isoformat() + "Z"
     )
     parser_version: str = "2.0"
-    schema_version: str = "2.0"
+    schema_version: Literal["2.0"] = "2.0"
+
+    @field_validator("raw_prompt")
+    @classmethod
+    def check_prompt_length(cls, v: str) -> str:
+        estimated_tokens = len(v) // 4
+        if estimated_tokens > MAX_PROMPT_TOKENS:
+            raise ValueError(
+                f"raw_prompt exceeds MAX_PROMPT_TOKENS ({MAX_PROMPT_TOKENS}). "
+                f"Estimated tokens: {estimated_tokens}. Truncate before passing to parser."
+            )
+        return v
+
+    @model_validator(mode="after")
+    def populate_goal_topology_compat(self) -> Self:
+        if self.goal_topologies and self.goal_topology is None:
+            self.goal_topology = self.goal_topologies[0].name
+        return self
+
+    @model_validator(mode="after")
+    def validate_clarification_protocol(self) -> Self:
+        if self.clarification_required and not any(a.blocking for a in self.ambiguities):
+            raise ValueError(
+                "clarification_required=True but no blocking ambiguity found. Set at least "
+                "one Ambiguity.blocking=True or set clarification_required=False."
+            )
+        return self
 
 
 # Backward-compatibility alias.
 # All existing imports of IntentDict continue to work unchanged.
 # All existing construction sites IntentDict(...) now construct ImprovedIntentDict.
 IntentDict = ImprovedIntentDict
+
+
+SCHEMA_VERSION = "2.0"
+
+
+def assert_schema_version(data: dict) -> None:
+    version = data.get("schema_version", "1.0")
+    if version != SCHEMA_VERSION:
+        raise SchemaVersionError(
+            f"IntentDict schema version mismatch: expected {SCHEMA_VERSION}, "
+            f"got {version}. Re-run Stage 1 parser to upgrade."
+        )
 
 
 class BOMEntry(BaseModel):
@@ -411,7 +426,15 @@ __all__ = [
     "CostConstraints",
     "ComponentPreference",
     "ImpliedRequirement",
+    "TopologyGuess",
     "DesignRequest",
+    "OutOfScopeRequest",
+    "ProductionVolume",
+    "Ambiguity",
+    "SchemaVersionError",
+    "SCHEMA_VERSION",
+    "MAX_PROMPT_TOKENS",
+    "assert_schema_version",
     "ImprovedIntentDict",
     "IntentDict",
     "BOMEntry",

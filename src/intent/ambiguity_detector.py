@@ -1,7 +1,7 @@
 """Ambiguity detector — identify fields needing clarification.
 
 Detects underspecified or conflicting fields in the parsed intent and generates
-AmbiguityFlag objects for user resolution.
+Ambiguity objects for user resolution.
 """
 
 from __future__ import annotations
@@ -10,7 +10,8 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.schemas.intent import AmbiguityFlag, DesignMethodology, FrequencySpec, IntentDict
+    from src.schemas.common import Ambiguity
+    from src.schemas.intent import DesignMethodology, FrequencySpec, IntentDict
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +36,10 @@ def _is_rf_without_frequency(
 def detect_ambiguities(
     intent: "IntentDict",
     prompt: str,
-) -> list["AmbiguityFlag"]:
+) -> list["Ambiguity"]:
     """Detect fields that need clarification.
 
-    Creates AmbiguityFlag objects for various underspecified conditions:
+    Creates Ambiguity objects for various underspecified conditions:
     - Goal is too generic ("circuit", "board", etc.)
     - Application is unspecified
     - RF design without frequency
@@ -49,7 +50,7 @@ def detect_ambiguities(
         prompt: Original user prompt for context
 
     Returns:
-        List of AmbiguityFlag objects
+        List of Ambiguity objects
 
     Example:
         >>> from src.schemas.intent import DesignMethodology, IntentDict
@@ -62,7 +63,7 @@ def detect_ambiguities(
         >>> len(flags) >= 1
         True
     """
-    from src.schemas.intent import AmbiguityFlag
+    from src.schemas.common import Ambiguity
 
     goal = intent.goal
     application = intent.application
@@ -72,16 +73,16 @@ def detect_ambiguities(
         flag.description for flag in intent.ambiguities
     ]
 
-    flags: list[AmbiguityFlag] = []
+    flags: list[Ambiguity] = []
 
     # Check 1: goal is too generic
     if _is_vague_goal(goal):
         flags.append(
-            AmbiguityFlag(
+            Ambiguity(
                 field="goal",
                 description="Goal is too generic",
-                severity="CRITICAL",
-                options=[],
+                severity="ERROR",
+                blocking=True,
             )
         )
         logger.debug(f"Ambiguity detected: goal '{goal}' is too vague")
@@ -89,22 +90,22 @@ def detect_ambiguities(
     # Check 2: application is unspecified
     if application.lower() in ("unspecified", "", "unknown"):
         flags.append(
-            AmbiguityFlag(
+            Ambiguity(
                 field="application",
                 description="Application context not specified",
                 severity="WARNING",
-                options=[],
             )
         )
 
     # Check 3: RF design without frequency
     if _is_rf_without_frequency(methodology, frequency):
         flags.append(
-            AmbiguityFlag(
+            Ambiguity(
                 field="frequency",
                 description="RF design requires a target frequency",
-                severity="CRITICAL",
-                options=["2.4 GHz", "5 GHz", "433 MHz", "915 MHz", "868 MHz"],
+                severity="ERROR",
+                candidate_resolutions=["2.4 GHz", "5 GHz", "433 MHz", "915 MHz", "868 MHz"],
+                blocking=True,
             )
         )
         logger.debug(f"Ambiguity detected: RF design without frequency")
@@ -112,11 +113,10 @@ def detect_ambiguities(
     # Check 4: LLM-reported ambiguities
     for ambiguity in llm_ambiguities:
         flags.append(
-            AmbiguityFlag(
-                field="unknown",  # LLM didn't specify which field
+            Ambiguity(
+                field="unknown",
                 description=ambiguity,
                 severity="WARNING",
-                options=[],
             )
         )
 

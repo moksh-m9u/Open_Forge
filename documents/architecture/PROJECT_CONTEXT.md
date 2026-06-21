@@ -10,10 +10,10 @@
 
 | Field | Value |
 |-------|-------|
-| **Last updated** | 2026-06-20 |
-| **Updated by** | Git history sync — repo consolidation, Team E output pipeline, Docker air-gap image |
-| **Current milestone** | Teams A–E gates implemented; **full E2E orchestrator + GPU eval deferred** |
-| **Active work** | Improvement-plan architecture (intent schema, DB, retrieval); GPU lab VLM eval |
+| **Last updated** | 2026-06-21 |
+| **Updated by** | Stage 2 completion engine smoke test (Entry 001 / Libbrecht-Hall prompt) |
+| **Current milestone** | Teams A–E gates implemented; **Stage 2 completion engine smoke-tested**; full E2E orchestrator + GPU eval deferred |
+| **Active work** | Improvement-plan rollout (intent schema v2, requirement completion); GPU lab VLM eval |
 | **Repo root** | `open_forge/` (package: `openforge-pcb`) |
 | **Code root** | `src/` (canonical); legacy P1 prototype at `prototypes/p1-parser/` |
 | **Unit tests** | 699 passing (`pytest tests/unit -q`) — per commit 76b78d6 |
@@ -39,6 +39,7 @@
 | `docker/build_airgapped_image.sh` | ✅ | Builds and exports `openforge-pcb:airgapped.tar` |
 | Full E2E orchestrator (prompt → fabrication files) | ⬜ | Team pipelines exist; top-level wiring pending |
 | Improvement-plan docs | ✅ | `documents/improvement_plan/` (5 architecture decisions + tscircuit loopholes) |
+| Stage 2 completion engine | 🟡 | `src/completion/` — smoke-tested on Entry 001; `tests/completion/smoke_test_real_prompts.py` 12/12 PASS |
 
 ---
 
@@ -157,10 +158,13 @@ Read in this order when implementing:
 | Intent parser | `src/intent/parser.py`, `pipeline.py` | ✅ |
 | Methodology classifier | `src/intent/methodology_classifier.py` | ✅ |
 | Ambiguity detector | `src/intent/ambiguity_detector.py` | ✅ |
+| Requirement completion engine (Stage 2) | `src/completion/engine.py`, `axiom_loader.py`, `contradiction_checker.py` | 🟡 Smoke-tested |
 | BOM generator | `src/bom/generator.py`, `selector.py`, `validator.py` | ✅ |
 | Supplier cache | `src/bom/supplier_cache.py` | ✅ |
 
-**Known gap:** Flat `explicit_constraints` strings — see `documents/improvement_plan/01_INTENT_PARSING_SCHEMA.md`.
+**Stage 2 smoke test (2026-06-21):** Against Entry 001 Libbrecht-Hall prompt (`SCIENTIFIC_PROMPT_ANALYSIS_LOG.md` Entry 003), `run_completion_engine` correctly escalated `operating_environment` and `supply_voltage` dangerous assumptions to blocking `Ambiguity` entries and set `clarification_required=True`. Harness: `tests/completion/smoke_test_real_prompts.py` (12/12 PASS).
+
+**Known gap:** `ImprovedIntentDict` v2 schema and Stage 2 not yet wired into the main intent pipeline — see `documents/improvement_plan/01_INTENT_PARSING_SCHEMA.md`, `02_REQUIREMENT_COMPLETION_ENGINE.md`.
 
 ---
 
@@ -212,6 +216,7 @@ Read in this order when implementing:
 src/
 ├── config.py
 ├── intent/                 # Team C — NL prompt → intent_dict
+├── completion/             # Team C — Stage 2 requirement completion engine
 ├── knowledge_graph/        # Team B — KG build, query, pin normalizer, ingestion
 ├── bom/                    # Team C — BOM generation and validation
 ├── datasheet/              # Team A — P1 parser (phases 1–5) + pipeline.py
@@ -228,6 +233,7 @@ src/
 
 ```
 tests/unit/                 # 699 tests across all teams
+tests/completion/           # Stage 2 gate + smoke tests (Entry 001/002 prompts)
 tests/integration/          # (placeholder)
 eval/gates/                 # Team acceptance gates A–F
 ```
@@ -294,7 +300,8 @@ High-level flow — full detail in `OPENFORGE_ARCHITECTURE.md`:
 
 ```
 Natural Language Prompt
-    → Intent Parser (Team C)
+    → Intent Parser (Team C) → ImprovedIntentDict
+    → Requirement Completion Engine — Stage 2 (Team C)  [halt if clarification_required]
     → KG Query (Team B)
     → BOM Generator (Team C) ──[human review if confidence < 0.85]──
     → Datasheet Parser P1 phases 1–5 (Team A)
@@ -344,6 +351,7 @@ open_forge/
 ├── documents/
 │   ├── architecture/
 │   │   ├── PROJECT_CONTEXT.md              ← this file
+│   │   ├── SCIENTIFIC_PROMPT_ANALYSIS_LOG.md  ← prompt gap + validation log
 │   │   ├── OPENFORGE_ARCHITECTURE.md       ← master design
 │   │   └── OPENFORGE_SUBSYSTEMS.md
 │   ├── improvement_plan/                   ← next-step architecture decisions
@@ -378,6 +386,7 @@ cd prototypes/p1-parser && python eval/phase1/run_eval.py
 
 | Date | Team/Phase | Summary |
 |------|------------|---------|
+| 2026-06-21 | C | Stage 2 requirement completion engine smoke-tested against Entry 001 (Libbrecht-Hall). `operating_environment` and `supply_voltage` dangerous assumptions correctly escalated to blocking ambiguities; `clarification_required=True`. `tests/completion/smoke_test_real_prompts.py` 12/12 PASS. Logged in `SCIENTIFIC_PROMPT_ANALYSIS_LOG.md` Entry 003. |
 | 2026-06-20 | E, F | Team E output pipeline complete (KiCad + tscircuit serializers, doc generator). Docker air-gap image added. 699 unit tests. Team E gate 10/10. |
 | 2026-06-20 | E | tscircuit architectural loopholes documented. |
 | 2026-06-19 | All | Repo consolidated: `openforge-pcb` at repo root; P1 prototype archived to `prototypes/p1-parser/`. Golden corpus promoted to `corpus/golden/`. Teams A–F code + gates bootstrapped. 654 unit tests; gates A–D pass. |

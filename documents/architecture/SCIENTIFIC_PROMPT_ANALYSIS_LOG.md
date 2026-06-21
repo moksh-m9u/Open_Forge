@@ -290,6 +290,37 @@ The prompt implies the SPICE file should be simulatable — implying correct SPI
 
 ---
 
+## Entry 003 — Stage 2 Smoke Test Validation (Entry 001 / Prompt 1)
+
+**Date:** 2026-06-21
+**Type:** Engine validation (not a new scientist prompt)
+**References:** Entry 001 — Libbrecht-Hall Precision Current Source
+**Status:** STAGE 2 VERIFIED — dangerous-assumption escalation behaves correctly for Prompt 1
+
+### CONTEXT
+
+The Stage 2 Requirement Completion Engine (`src/completion/engine.py`) was smoke-tested end-to-end against the Entry 001 Libbrecht-Hall prompt using a manually constructed `ImprovedIntentDict` and a mocked LLM response (no live API calls). Test harness: `tests/completion/smoke_test_real_prompts.py`.
+
+### STAGE 2 BEHAVIOUR VERIFIED (PROMPT 1)
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| Axiom loading | ✅ | `load_axioms_for_intent` returned ≥5 axioms from `data/domain_knowledge/libbrecht_hall.yaml` with preconditions evaluated against the intent |
+| Dangerous assumption → `operating_environment` | ✅ | Promoted to blocking `Ambiguity` (`blocking=True`, severity `ERROR`) |
+| Dangerous assumption → `supply_voltage` | ✅ | Promoted to blocking `Ambiguity` (`blocking=True`, severity `ERROR`) |
+| `clarification_required` | ✅ | Set to `True` when blocking ambiguities present |
+| Inferred constraints threshold | ✅ | Only requirements with confidence ≥ 0.80 appear in `inferred_constraints` |
+| Rule checker — negative rail | ✅ | No spurious contradiction when `negative_rail_converter` is already implied |
+| Rule checker — bypass cap | ✅ | WARNING fired when `low_noise_ldo` implied without bypass/decoupling requirement |
+
+**Smoke test verdict:** 12/12 assertions passed (9 for Prompt 1, 3 for Prompt 2 multi-topology / threshold cases).
+
+### IMPLICATION FOR ENTRY 001
+
+Entry 001 gaps (KG-2 topology, KG-3 components, noise analysis) remain **OPEN**. Stage 2 does not close those gaps. What it does provide: the system will **not silently assume** `operating_environment=laboratory` or `supply_voltage=15V–24V` for this prompt class. The pipeline must halt and request engineer confirmation before proceeding to BOM generation or synthesis.
+
+---
+
 ## Gap Registry — Consolidated View
 
 All open gaps across all entries. Update STATUS when resolved.

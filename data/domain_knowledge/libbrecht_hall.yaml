@@ -1,0 +1,141 @@
+topology: libbrecht_hall
+description: >
+  High-gain feedback current source using op-amp + sense resistor.
+  Regulates current by comparing setpoint voltage to drop across sense resistor.
+
+noise_sources_ranked:
+  - rank: 1
+    source: "Sense resistor Johnson noise"
+    formula: "V_n = sqrt(4kTRΔf)"
+  - rank: 2
+    source: "Op-amp input voltage noise (e_n) referred to output as e_n/R_sense"
+  - rank: 3
+    source: "Op-amp input current noise (i_n) — directly adds to output noise"
+  - rank: 4
+    source: "Reference voltage noise — appears at output 1:1"
+  - rank: 5
+    source: "Power supply noise — appears at output through PSRR"
+
+axioms:
+  - id: axiom_kelvin_sensing_001
+    preconditions:
+      any_of:
+        - "performance.noise.target_value < 1"
+        - "performance.accuracy.absolute_ppm < 100"
+        - "component_preferences contains zero_drift_op_amp"
+        - "performance.output_current_ma >= 10"
+    implies:
+      requirement: "Kelvin (4-wire) connection on sense resistor"
+      component_implication: "pcb_layout_constraint"
+      reasoning: >
+        At output currents ≥10mA, even 1mΩ of lead resistance in the sense
+        path introduces 10µV of error. Kelvin sensing eliminates this by
+        separating current and voltage sense paths at the resistor body.
+      priority: CRITICAL
+    default_confidence: 0.97
+    source_citations:
+      - "Libbrecht-Hall, RSI 67(3), 1996, p.3"
+
+  - id: axiom_low_noise_ldo_001
+    preconditions:
+      any_of:
+        - "performance.noise.raw_text contains 'ultra low noise'"
+        - "performance.noise.raw_text contains 'low noise'"
+        - "component_preferences contains zero_drift_op_amp"
+    implies:
+      requirement: "Low-noise LDO for op-amp analog supply rail"
+      component_implication: "low_noise_ldo"
+      reasoning: >
+        Supply noise on op-amp VCC appears at output as V_supply_noise / PSRR.
+        For sub-pA/rtHz noise floor, LDO output noise must be <10nV/rtHz.
+      priority: CRITICAL
+    default_confidence: 0.95
+    source_citations:
+      - "TI SLVA882, p.4"
+
+  - id: axiom_precision_vref_001
+    preconditions:
+      any_of:
+        - "goal_topology contains 'libbrecht_hall'"
+        - "performance.accuracy.absolute_ppm < 100"
+    implies:
+      requirement: "Precision voltage reference for current setpoint"
+      component_implication: "precision_voltage_reference"
+      reasoning: >
+        Libbrecht-Hall topology uses a voltage reference to set output current
+        via the sense resistor. Absolute current accuracy equals reference
+        accuracy. Ultra-precision requirement implies <10ppm reference.
+      priority: CRITICAL
+    default_confidence: 0.98
+    source_citations:
+      - "Libbrecht-Hall, RSI 67(3), 1996, p.4"
+
+  - id: axiom_guard_ring_001
+    preconditions:
+      any_of:
+        - "performance.noise.target_value < 1"
+        - "performance.noise.raw_text contains 'ultra low noise'"
+    implies:
+      requirement: "Guard ring around sense resistor and op-amp input nodes"
+      component_implication: "pcb_layout_constraint"
+      reasoning: >
+        PCB surface leakage between nodes can introduce currents exceeding a
+        sub-pA/rtHz noise floor. Guard rings driven at local potential eliminate
+        this leakage path.
+      priority: HIGH
+    default_confidence: 0.85
+    source_citations:
+      - "TI SLOA035, p.6"
+
+  - id: axiom_negative_rail_001
+    preconditions:
+      all_of:
+        - "component_preferences contains zero_drift_op_amp"
+        - "electrical.supply_topology == single_dc"
+    implies:
+      requirement: "Negative voltage rail generation from single DC input"
+      component_implication: "negative_rail_converter"
+      reasoning: >
+        Zero-drift op-amps require bipolar supply for rail-to-rail output swing
+        at the sense node. Single DC input implies inverting charge pump or
+        negative LDO to generate the negative rail.
+      priority: CRITICAL
+    default_confidence: 0.92
+    source_citations: []
+
+  - id: axiom_compensation_network_001
+    preconditions:
+      any_of:
+        - "goal_topology contains 'libbrecht_hall'"
+    implies:
+      requirement: "Compensation capacitor network for loop stability"
+      component_implication: "passive_compensation_network"
+      reasoning: >
+        High-gain feedback loop driving a power transistor is conditionally
+        stable. Compensation capacitor across op-amp feedback resistor sets
+        gain-bandwidth rolloff and prevents oscillation.
+      priority: HIGH
+    default_confidence: 0.94
+    source_citations:
+      - "Libbrecht-Hall, RSI 67(3), 1996, p.5"
+
+  - id: axiom_matched_resistor_001
+    preconditions:
+      any_of:
+        - "performance.stability.raw_text contains 'highly stable'"
+        - "performance.accuracy.absolute_ppm < 100"
+    implies:
+      requirement: "Matched low-tempco resistor pair for voltage divider setpoint"
+      component_implication: "precision_resistor_pair"
+      reasoning: >
+        The potentiometer sets the current magnitude. Mismatched tempco between
+        the potentiometer and fixed resistors introduces temperature-dependent
+        drift in the setpoint voltage.
+      priority: HIGH
+    default_confidence: 0.88
+    source_citations: []
+
+dangerous_assumption_fields:
+  - operating_environment
+  - supply_voltage
+  - temperature_range

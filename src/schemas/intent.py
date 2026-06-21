@@ -16,6 +16,7 @@ Version History:
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
 from typing import Any, Literal, Optional
 
@@ -76,7 +77,143 @@ class DesignMethodology(str, Enum):
     THROUGH_HOLE = "through_hole"  # Through-hole designs (prototyping, high power)
 
 
-class IntentDict(BaseModel):
+class NoiseSpec(BaseModel):
+    target_value: Optional[float] = None
+    unit: Optional[str] = None
+    bandwidth_hz: Optional[float] = None
+    measurement_condition: Optional[str] = None
+    raw_text: str
+
+
+class AccuracySpec(BaseModel):
+    absolute_ppm: Optional[float] = None
+    relative_percent: Optional[float] = None
+    drift_ppm_per_C: Optional[float] = None
+    raw_text: str
+
+
+class StabilitySpec(BaseModel):
+    short_term_ppm: Optional[float] = None
+    long_term_ppm_per_year: Optional[float] = None
+    thermal_stability_ppm_per_C: Optional[float] = None
+    raw_text: str
+
+
+class PerformanceRequirements(BaseModel):
+    noise: Optional[NoiseSpec] = None
+    accuracy: Optional[AccuracySpec] = None
+    stability: Optional[StabilitySpec] = None
+    output_current_ma: Optional[float] = None
+    output_current_range: Optional[tuple[float, float]] = None
+    adjustability: Optional[str] = None
+    settling_time_us: Optional[float] = None
+    bandwidth_hz: Optional[float] = None
+
+
+class VoltageSpec(BaseModel):
+    min_v: Optional[float] = None
+    typ_v: Optional[float] = None
+    max_v: Optional[float] = None
+    raw_text: str
+
+
+class CurrentSpec(BaseModel):
+    min_ma: Optional[float] = None
+    typ_ma: Optional[float] = None
+    max_ma: Optional[float] = None
+    raw_text: str
+
+
+class ElectricalConstraints(BaseModel):
+    supply_voltage: Optional[VoltageSpec] = None
+    supply_topology: Optional[str] = None
+    supply_current_budget: Optional[CurrentSpec] = None
+    output_voltage_compliance: Optional[VoltageSpec] = None
+    output_current: Optional[CurrentSpec] = None
+    power_budget_mw: Optional[float] = None
+    input_impedance_ohm: Optional[float] = None
+    output_impedance_ohm: Optional[float] = None
+    isolation_required: bool = False
+    polarity_generation_required: bool = False
+
+
+class ThermalConstraints(BaseModel):
+    operating_temp_min_c: Optional[float] = None
+    operating_temp_max_c: Optional[float] = None
+    storage_temp_min_c: Optional[float] = None
+    storage_temp_max_c: Optional[float] = None
+    thermal_matching_required: bool = False
+    kelvin_sensing_required: bool = False
+    max_self_heating_c: Optional[float] = None
+    thermal_resistance_target_c_per_w: Optional[float] = None
+
+
+class ManufacturingConstraints(BaseModel):
+    assembly_process: Optional[str] = None
+    pcb_layers: Optional[int] = None
+    board_dimensions_mm: Optional[tuple[float, float]] = None
+    min_trace_width_mm: Optional[float] = None
+    min_clearance_mm: Optional[float] = None
+    surface_finish: Optional[str] = None
+    ipc_class: Optional[str] = None
+
+
+class ReliabilityRequirements(BaseModel):
+    mtbf_hours: Optional[float] = None
+    operating_environment: Optional[str] = None
+    vibration_spec: Optional[str] = None
+    shock_spec: Optional[str] = None
+    humidity_range_percent: Optional[tuple[float, float]] = None
+    altitude_m: Optional[float] = None
+    radiation_tolerance: Optional[str] = None
+
+
+class ComplianceRequirements(BaseModel):
+    standards: list[str] = Field(default_factory=list)
+    emc_class: Optional[str] = None
+    safety_class: Optional[str] = None
+    export_control: Optional[str] = None
+    country_of_origin_restriction: Optional[str] = None
+
+
+class CostConstraints(BaseModel):
+    bom_budget_usd: Optional[float] = None
+    per_unit_target_usd: Optional[float] = None
+    production_volume: Optional[str] = None
+    prefer_cots: bool = True
+    avoid_obsolete: bool = True
+    preferred_suppliers: list[str] = Field(default_factory=list)
+    blacklisted_suppliers: list[str] = Field(default_factory=list)
+
+
+class ComponentPreference(BaseModel):
+    component_type: str
+    preferred_series: Optional[str] = None
+    preferred_manufacturer: Optional[str] = None
+    required_attribute: Optional[str] = None
+    exclusion: Optional[str] = None
+
+
+class ImpliedRequirement(BaseModel):
+    requirement: str
+    component_implication: Optional[str] = None
+    reasoning: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    source_constraint: str
+    priority: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"] = "MEDIUM"
+
+
+class DesignRequest(BaseModel):
+    request_type: Literal[
+        "bom", "schematic", "pcb_layout", "noise_analysis",
+        "simulation", "spice_netlist", "design_report",
+        "python_gui", "firmware",
+    ]
+    in_scope: bool
+    out_of_scope_reason: Optional[str] = None
+
+
+class _IntentDictBase(BaseModel):
     """Structured design intent extracted from user prompt.
 
     Represents the parsed and interpreted design requirements from
@@ -121,6 +258,40 @@ class IntentDict(BaseModel):
         description="True if CRITICAL ambiguities exist requiring user input",
     )
     raw_prompt: str = Field(description="Original user input for provenance")
+
+
+class ImprovedIntentDict(_IntentDictBase):
+    """
+    IntentDict v2. Extends v1 with typed requirement categories.
+    All v1 fields inherited unchanged from _IntentDictBase.
+    All new fields have defaults — v1 construction sites work without modification.
+    """
+    # New v2 fields — ALL have defaults so existing construction sites are unaffected
+    goal_confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    goal_topology: Optional[str] = None
+    performance: Optional[PerformanceRequirements] = None
+    electrical: Optional[ElectricalConstraints] = None
+    thermal: Optional[ThermalConstraints] = None
+    manufacturing: Optional[ManufacturingConstraints] = None
+    reliability: Optional[ReliabilityRequirements] = None
+    compliance: Optional[ComplianceRequirements] = None
+    cost: Optional[CostConstraints] = None
+    component_preferences: list[ComponentPreference] = Field(default_factory=list)
+    implied_requirements: list[ImpliedRequirement] = Field(default_factory=list)
+    missing_critical_specs: list[str] = Field(default_factory=list)
+    contradictions_detected: list[str] = Field(default_factory=list)
+    design_requests: list[DesignRequest] = Field(default_factory=list)
+    parsed_at: str = Field(
+        default_factory=lambda: datetime.utcnow().isoformat() + "Z"
+    )
+    parser_version: str = "2.0"
+    schema_version: str = "2.0"
+
+
+# Backward-compatibility alias.
+# All existing imports of IntentDict continue to work unchanged.
+# All existing construction sites IntentDict(...) now construct ImprovedIntentDict.
+IntentDict = ImprovedIntentDict
 
 
 class BOMEntry(BaseModel):
@@ -185,7 +356,7 @@ class ValidatedBOM(BaseModel):
     """
 
     design_id: str = Field(description="Unique identifier for this design")
-    intent: IntentDict = Field(
+    intent: ImprovedIntentDict = Field(
         description="Parsed design intent that generated this BOM"
     )
     components: list[BOMEntry] = Field(
@@ -226,6 +397,22 @@ __all__ = [
     "FrequencySpec",
     "AmbiguityFlag",
     "DesignMethodology",
+    "NoiseSpec",
+    "AccuracySpec",
+    "StabilitySpec",
+    "PerformanceRequirements",
+    "VoltageSpec",
+    "CurrentSpec",
+    "ElectricalConstraints",
+    "ThermalConstraints",
+    "ManufacturingConstraints",
+    "ReliabilityRequirements",
+    "ComplianceRequirements",
+    "CostConstraints",
+    "ComponentPreference",
+    "ImpliedRequirement",
+    "DesignRequest",
+    "ImprovedIntentDict",
     "IntentDict",
     "BOMEntry",
     "ValidatedBOM",

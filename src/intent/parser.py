@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, Field
 
+from src.schemas.intent import ImprovedIntentDict
+
 if TYPE_CHECKING:
     from src.config import Config
     from src.schemas.intent import (
@@ -358,7 +360,6 @@ def parse_intent(
     from src.schemas.intent import (
         AmbiguityFlag,
         DesignMethodology,
-        IntentDict,
     )
 
     # Step 1: Parse with LLM or fallback
@@ -384,7 +385,7 @@ def parse_intent(
     )
 
     # Step 4: Detect ambiguities
-    draft_intent = IntentDict(
+    draft_intent = ImprovedIntentDict(
         goal=cleaned_goal,
         frequency=parsed.frequency,
         application=parsed.application,
@@ -413,7 +414,7 @@ def parse_intent(
     )
 
     # Step 6: Construct IntentDict
-    return IntentDict(
+    return ImprovedIntentDict(
         goal=cleaned_goal,
         frequency=parsed.frequency,
         application=parsed.application,

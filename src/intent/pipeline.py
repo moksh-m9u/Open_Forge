@@ -11,7 +11,12 @@ from src.intent.parser import parse_intent
 from src.knowledge_graph import query_graph
 from src.knowledge_graph.graph import KnowledgeGraph
 from src.review.queue import enqueue_bom
-from src.schemas.intent import DesignMethodology, IntentDict, ValidatedBOM
+from src.schemas.intent import (
+    DesignMethodology,
+    ImprovedIntentDict,
+    IntentDict,
+    ValidatedBOM,
+)
 from src.schemas.kg import DesignSubgraph
 
 logger = logging.getLogger(__name__)
@@ -45,7 +50,7 @@ def run_intent_pipeline(
 
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")
-        fallback_intent = IntentDict(
+        fallback_intent = ImprovedIntentDict(
             goal="unknown",
             application="unknown",
             design_methodology=DesignMethodology.STANDARD_SMD,
